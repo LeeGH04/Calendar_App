@@ -117,8 +117,14 @@ public class CalendarApp extends JFrame {
         addButton.addActionListener(e -> {
             String input = todoInput.getText().trim();
             if (!input.isEmpty()) {
-                Date startTime = (Date) startTimeSpinner.getValue();
-                Date endTime = (Date) endTimeSpinner.getValue();
+                // util.Date를 sql.Time으로 변환
+                java.util.Date startDate = (java.util.Date) startTimeSpinner.getValue();
+                java.util.Date endDate = (java.util.Date) endTimeSpinner.getValue();
+
+                // Time 객체 생성
+                java.sql.Time startTime = new java.sql.Time(startDate.getTime());
+                java.sql.Time endTime = new java.sql.Time(endDate.getTime());
+
                 addTodo(input, startTime, endTime);
                 todoInput.setText("");
                 updateTodoDisplay();
@@ -267,15 +273,15 @@ public class CalendarApp extends JFrame {
         }
     }
 
-    private void addTodo(String title, java.util.Date startTime, java.util.Date endTime) {
+    private void addTodo(String title, java.sql.Time startTime, java.sql.Time endTime) {
         String sql = "INSERT INTO todos (user_id, title, date, start_time, end_time) VALUES (?, ?, ?, ?, ?)";
 
         try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
             pstmt.setInt(1, currentUserId);
             pstmt.setString(2, title);
             pstmt.setDate(3, new java.sql.Date(calendar.getTime().getTime()));
-            pstmt.setTime(4, new java.sql.Time(startTime.getTime()));
-            pstmt.setTime(5, new java.sql.Time(endTime.getTime()));
+            pstmt.setTime(4, startTime);
+            pstmt.setTime(5, endTime);
 
             pstmt.executeUpdate();
             updateCalendar();
@@ -284,7 +290,6 @@ public class CalendarApp extends JFrame {
             JOptionPane.showMessageDialog(this, "할 일 추가 실패: " + e.getMessage());
         }
     }
-
     public static void main(String[] args) {
         SwingUtilities.invokeLater(() -> {
             CalendarApp app = new CalendarApp();

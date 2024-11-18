@@ -3,8 +3,16 @@ package calendar;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;
-import java.util.*;
-import java.util.List;
+import java.sql.*;
+import java.util.Calendar;
+import java.util.HashMap;
+import java.util.Map;
+
+// Date 클래스들을 명시적으로 import
+import java.sql.Date;
+import java.sql.Time;
+
+
 
 public class CalendarApp extends JFrame {
     private JLabel monthLabel;
@@ -12,16 +20,24 @@ public class CalendarApp extends JFrame {
     private Calendar calendar;
     private int currentMonth;
     private int currentYear;
-    private Map<String, List<String>> todoList; // 날짜별 할 일 저장
     private JTextArea todoArea;
+    private int currentUserId = 1; // 현재 로그인한 사용자 ID (임시)
+
+    // 데이터베이스 연결 정보
+    private static final String DB_URL = "jdbc:mysql://localhost:3306/calendar_db";
+    private static final String DB_USER = "LeeGH04"; // MySQL 사용자 이름
+    private static final String DB_PASSWORD = "0004"; // MySQL 비밀번호
+
+    private Connection conn;
 
     public CalendarApp() {
+        initializeDatabase();
+
         setTitle("캘린더 & 할 일");
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setSize(800, 500);
         setLayout(new BorderLayout());
 
-        todoList = new HashMap<>();
         calendar = Calendar.getInstance();
         currentMonth = calendar.get(Calendar.MONTH);
         currentYear = calendar.get(Calendar.YEAR);
@@ -57,8 +73,23 @@ public class CalendarApp extends JFrame {
         JTextField todoInput = new JTextField();
         JButton addButton = new JButton("추가");
 
-        inputPanel.add(todoInput, BorderLayout.CENTER);
-        inputPanel.add(addButton, BorderLayout.EAST);
+        // 시간 선택 패널
+        JPanel timePanel = new JPanel(new FlowLayout());
+        JSpinner startTimeSpinner = new JSpinner(new SpinnerDateModel());
+        JSpinner endTimeSpinner = new JSpinner(new SpinnerDateModel());
+        JSpinner.DateEditor startTimeEditor = new JSpinner.DateEditor(startTimeSpinner, "HH:mm");
+        JSpinner.DateEditor endTimeEditor = new JSpinner.DateEditor(endTimeSpinner, "HH:mm");
+        startTimeSpinner.setEditor(startTimeEditor);
+        endTimeSpinner.setEditor(endTimeEditor);
+
+        timePanel.add(new JLabel("시작:"));
+        timePanel.add(startTimeSpinner);
+        timePanel.add(new JLabel("종료:"));
+        timePanel.add(endTimeSpinner);
+
+        inputPanel.add(todoInput, BorderLayout.NORTH);
+        inputPanel.add(timePanel, BorderLayout.CENTER);
+        inputPanel.add(addButton, BorderLayout.SOUTH);
 
         rightPanel.add(todoLabel, BorderLayout.NORTH);
         rightPanel.add(scrollPane, BorderLayout.CENTER);
@@ -86,13 +117,13 @@ public class CalendarApp extends JFrame {
         addButton.addActionListener(e -> {
             String input = todoInput.getText().trim();
             if (!input.isEmpty()) {
-                addTodo(input);
+                Date startTime = (Date) startTimeSpinner.getValue();
+                Date endTime = (Date) endTimeSpinner.getValue();
+                addTodo(input, startTime, endTime);
                 todoInput.setText("");
                 updateTodoDisplay();
             }
         });
-
-        todoInput.addActionListener(e -> addButton.doClick());
 
         leftPanel.add(topPanel, BorderLayout.NORTH);
         leftPanel.add(calendarPanel, BorderLayout.CENTER);
@@ -105,13 +136,26 @@ public class CalendarApp extends JFrame {
         updateCalendar();
     }
 
+    private void initializeDatabase() {
+        try {
+            Class.forName("com.mysql.cj.jdbc.Driver");
+            conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD);
+        } catch (Exception e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(this, "데이터베이스 연결 실패: " + e.getMessage());
+        }
+    }
+
+    private void updateTodoDisplay() {
+        // 현재 선택된 날짜의 할 일 목록을 다시 표시
+        selectDate(calendar.get(Calendar.DAY_OF_MONTH));
+    }
+
     private void updateCalendar() {
         calendarPanel.removeAll();
 
-        // 월/년 레이블 업데이트
         monthLabel.setText(String.format("%d년 %d월", currentYear, currentMonth + 1));
 
-        // 요일 헤더 추가
         String[] weekDays = {"일", "월", "화", "수", "목", "금", "토"};
         for (String day : weekDays) {
             JLabel label = new JLabel(day, SwingConstants.CENTER);
@@ -123,23 +167,22 @@ public class CalendarApp extends JFrame {
             calendarPanel.add(label);
         }
 
-        // 달력 날짜 설정
         calendar.set(currentYear, currentMonth, 1);
         int firstDay = calendar.get(Calendar.DAY_OF_WEEK) - 1;
         int daysInMonth = calendar.getActualMaximum(Calendar.DAY_OF_MONTH);
 
-        // 빈 공간 추가
         for (int i = 0; i < firstDay; i++) {
             calendarPanel.add(new JLabel(""));
         }
 
-        // 날짜 추가
+        // 날짜별 할 일 개수 조회
+        Map<Integer, Integer> todoCount = getTodoCountForMonth();
+
         for (int day = 1; day <= daysInMonth; day++) {
             JLabel dayLabel = new JLabel(String.valueOf(day), SwingConstants.CENTER);
             dayLabel.setOpaque(true);
             dayLabel.setBorder(BorderFactory.createLineBorder(Color.LIGHT_GRAY));
 
-            // 날짜 클릭 이벤트
             final int currentDay = day;
             dayLabel.addMouseListener(new MouseAdapter() {
                 @Override
@@ -148,7 +191,6 @@ public class CalendarApp extends JFrame {
                 }
             });
 
-            // 주말 색상 설정
             calendar.set(Calendar.DAY_OF_MONTH, day);
             int dayOfWeek = calendar.get(Calendar.DAY_OF_WEEK);
             if (dayOfWeek == Calendar.SUNDAY) {
@@ -158,8 +200,7 @@ public class CalendarApp extends JFrame {
             }
 
             // 할 일이 있는 날짜 표시
-            String dateKey = String.format("%d-%d-%d", currentYear, currentMonth + 1, day);
-            if (todoList.containsKey(dateKey) && !todoList.get(dateKey).isEmpty()) {
+            if (todoCount.containsKey(day) && todoCount.get(day) > 0) {
                 dayLabel.setBackground(new Color(255, 255, 200));
             } else {
                 dayLabel.setBackground(Color.WHITE);
@@ -172,31 +213,76 @@ public class CalendarApp extends JFrame {
         calendarPanel.repaint();
     }
 
-    private void selectDate(int day) {
-        String dateKey = String.format("%d-%d-%d", currentYear, currentMonth + 1, day);
-        todoArea.setText(String.format("=== %d년 %d월 %d일 할 일 ===\n", currentYear, currentMonth + 1, day));
-        if (todoList.containsKey(dateKey)) {
-            List<String> todos = todoList.get(dateKey);
-            for (int i = 0; i < todos.size(); i++) {
-                todoArea.append(String.format("%d. %s\n", i + 1, todos.get(i)));
+    private Map<Integer, Integer> getTodoCountForMonth() {
+        Map<Integer, Integer> todoCount = new HashMap<>();
+        String sql = "SELECT DAY(date) as day, COUNT(*) as count FROM todos " +
+                "WHERE user_id = ? AND YEAR(date) = ? AND MONTH(date) = ? " +
+                "GROUP BY DAY(date)";
+
+        try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setInt(1, currentUserId);
+            pstmt.setInt(2, currentYear);
+            pstmt.setInt(3, currentMonth + 1);
+
+            ResultSet rs = pstmt.executeQuery();
+            while (rs.next()) {
+                todoCount.put(rs.getInt("day"), rs.getInt("count"));
             }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+
+        return todoCount;
+    }
+
+    private void selectDate(int day) {
+        calendar.set(currentYear, currentMonth, day);
+        String sql = "SELECT title, start_time, end_time, completed FROM todos " +
+                "WHERE user_id = ? AND date = ? ORDER BY start_time";
+
+        todoArea.setText(String.format("=== %d년 %d월 %d일 할 일 ===\n", currentYear, currentMonth + 1, day));
+
+        try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setInt(1, currentUserId);
+            pstmt.setDate(2, java.sql.Date.valueOf(String.format("%d-%02d-%02d",
+                    currentYear, currentMonth + 1, day)));
+
+            ResultSet rs = pstmt.executeQuery();
+            int count = 1;
+            while (rs.next()) {
+                String title = rs.getString("title");
+                Time startTime = rs.getTime("start_time");
+                Time endTime = rs.getTime("end_time");
+                boolean completed = rs.getBoolean("completed");
+
+                String status = completed ? "[완료]" : "[진행중]";
+                todoArea.append(String.format("%d. %s %s (%s-%s)\n",
+                        count++, status, title,
+                        startTime.toString().substring(0, 5),
+                        endTime.toString().substring(0, 5)));
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+            todoArea.append("할 일 목록을 불러오는데 실패했습니다.\n");
         }
     }
 
-    private void addTodo(String todo) {
-        calendar.set(currentYear, currentMonth, calendar.get(Calendar.DAY_OF_MONTH));
-        String dateKey = String.format("%d-%d-%d", currentYear, currentMonth + 1, calendar.get(Calendar.DAY_OF_MONTH));
+    private void addTodo(String title, java.util.Date startTime, java.util.Date endTime) {
+        String sql = "INSERT INTO todos (user_id, title, date, start_time, end_time) VALUES (?, ?, ?, ?, ?)";
 
-        if (!todoList.containsKey(dateKey)) {
-            todoList.put(dateKey, new ArrayList<>());
+        try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setInt(1, currentUserId);
+            pstmt.setString(2, title);
+            pstmt.setDate(3, new java.sql.Date(calendar.getTime().getTime()));
+            pstmt.setTime(4, new java.sql.Time(startTime.getTime()));
+            pstmt.setTime(5, new java.sql.Time(endTime.getTime()));
+
+            pstmt.executeUpdate();
+            updateCalendar();
+        } catch (SQLException e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(this, "할 일 추가 실패: " + e.getMessage());
         }
-        todoList.get(dateKey).add(todo);
-        updateCalendar();
-        updateTodoDisplay();
-    }
-
-    private void updateTodoDisplay() {
-        selectDate(calendar.get(Calendar.DAY_OF_MONTH));
     }
 
     public static void main(String[] args) {

@@ -14,7 +14,7 @@ import java.sql.Time;
 
 
 
-public class CalendarApp extends JFrame {
+public class CalendarApp extends javax.swing.JFrame {
     private JLabel monthLabel;
     private JPanel calendarPanel;
     private Calendar calendar;
@@ -25,14 +25,13 @@ public class CalendarApp extends JFrame {
 
     // 데이터베이스 연결 정보
     private static final String DB_URL = "jdbc:mysql://localhost:3306/calendar_db";
-    private static final String DB_USER = "LeeGH04"; // MySQL 사용자 이름
-    private static final String DB_PASSWORD = "0004"; // MySQL 비밀번호
+    private static final String DB_USER = "root"; // MySQL 사용자 이름
+    private static final String DB_PASSWORD = "lo112233.."; // MySQL 비밀번호
 
     private Connection conn;
-
+    
     public CalendarApp() {
         initializeDatabase();
-
         setTitle("캘린더 & 할 일");
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setSize(800, 500);
@@ -242,24 +241,44 @@ public class CalendarApp extends JFrame {
     }
 
     private void selectDate(int day) {
-        calendar.set(currentYear, currentMonth, day);
-        String sql = "SELECT title, start_time, end_time, completed FROM todos " +
-                "WHERE user_id = ? AND date = ? ORDER BY start_time";
+       calendar.set(currentYear, currentMonth, day);
+
+        // 현재 날짜 및 시간 가져오기
+        java.time.LocalDateTime now = java.time.LocalDateTime.now();
+        java.sql.Timestamp nowTimestamp = java.sql.Timestamp.valueOf(now);
+
+        // 지난 항목을 완료로 업데이트하는 SQL 쿼리
+        String updateSql = "UPDATE todos SET completed = 1 " +
+                           "WHERE user_id = ? AND (date < ? OR (date = ? AND end_time < ?)) AND completed = 0";
+
+        // 선택된 날짜의 할 일 목록을 가져오는 SQL 쿼리
+        String selectSql = "SELECT title, start_time, end_time, completed FROM todos " +
+                           "WHERE user_id = ? AND date = ? ORDER BY start_time";
 
         todoArea.setText(String.format("=== %d년 %d월 %d일 할 일 ===\n", currentYear, currentMonth + 1, day));
 
-        try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
-            pstmt.setInt(1, currentUserId);
-            pstmt.setDate(2, java.sql.Date.valueOf(String.format("%d-%02d-%02d",
+        try (PreparedStatement updateStmt = conn.prepareStatement(updateSql);
+             PreparedStatement selectStmt = conn.prepareStatement(selectSql)) {
+
+            // 업데이트 쿼리 실행
+            updateStmt.setInt(1, currentUserId);
+            updateStmt.setDate(2, java.sql.Date.valueOf(now.toLocalDate())); // 현재 날짜 이전
+            updateStmt.setDate(3, java.sql.Date.valueOf(now.toLocalDate())); // 현재 날짜와 동일
+            updateStmt.setTime(4, java.sql.Time.valueOf(now.toLocalTime())); // 현재 시간보다 이전
+            updateStmt.executeUpdate();
+
+            // 조회 쿼리 실행
+            selectStmt.setInt(1, currentUserId);
+            selectStmt.setDate(2, java.sql.Date.valueOf(String.format("%d-%02d-%02d",
                     currentYear, currentMonth + 1, day)));
 
-            ResultSet rs = pstmt.executeQuery();
+            ResultSet rs = selectStmt.executeQuery();
             int count = 1;
             while (rs.next()) {
                 String title = rs.getString("title");
                 Time startTime = rs.getTime("start_time");
                 Time endTime = rs.getTime("end_time");
-                boolean completed = rs.getBoolean("completed");
+                boolean completed = rs.getBoolean("completed"); // TINYINT를 Boolean으로 처리
 
                 String status = completed ? "[완료]" : "[진행중]";
                 todoArea.append(String.format("%d. %s %s (%s-%s)\n",

@@ -4,16 +4,41 @@
  */
 package calendar;
 
-import java.io.IOException;
-import java.net.HttpURLConnection;
-import java.net.URL;
-import java.io.OutputStream;
-import java.util.Scanner;
+// 기본 Swing 컴포넌트
+import javax.swing.*;
+import javax.swing.JFrame;
+import javax.swing.JLabel;
+import javax.swing.JTextField;
+import javax.swing.JButton;
 import javax.swing.JOptionPane;
+import javax.swing.ImageIcon;
+
+// AWT 관련
+import java.awt.*;
+import java.awt.Color;
+import java.awt.Font;
+import java.awt.Graphics2D;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import java.awt.image.BufferedImage;
+
+// SQL 관련
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.sql.SQLException;
+
+// 유틸리티
+import java.util.Random;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+// 이벤트 처리
+import java.awt.event.*;
+
+// IO 관련
+import java.io.IOException;
 /**
  *
  * @author gnlck
@@ -22,16 +47,116 @@ public class MainFrame extends javax.swing.JFrame {
     /**
      * Creates new form MainFrame
      */
+//    private final String DB_URL = "jdbc:mysql://localhost:3306/calendar_db";
+//    private final String DB_USER = "root";  // MySQL 사용자 이름
+//    private final String DB_PASSWORD = "lo112233..";  // MySQL 비밀번호
+    
     private final String DB_URL = "jdbc:mysql://localhost:3306/calendar_db";
-    private final String DB_USER = "root";  // MySQL 사용자 이름
-    private final String DB_PASSWORD = "lo112233..";  // MySQL 비밀번호
-    private final String RECAPTCHA_SECRET_KEY = "6Lcxu4gqAAAAAJA8J0J7ykgb9c5m93aLXV51NqvH";  // Google reCAPTCHA 비밀 키
+    private final String DB_USER = "LeeGH04";  // MySQL 사용자 이름
+    private final String DB_PASSWORD = "0004";  // MySQL 비밀번호
+     
+    private String captchaAnswer; // 현재 캡챠 답변 저장
+    private Random random = new Random();
     
     
     public MainFrame() {
         initComponents();
+        setupCaptcha();
     }
-
+       private void setupCaptcha() {
+        // 새로고침 버튼에 이벤트 리스너 추가
+        jButtonRefresh.addActionListener(e -> refreshCaptcha());
+        
+        // 초기 캡챠 이미지 생성
+        refreshCaptcha();
+    }
+    
+      private void refreshCaptcha() {
+        try {
+            // 랜덤한 6자리 문자열 생성
+            captchaAnswer = generateCaptchaText();
+            
+            // 캡챠 이미지 생성
+            BufferedImage captchaImage = generateCaptchaImage(captchaAnswer);
+            
+            // 이미지를 라벨에 설정
+            jLabelCaptcha.setIcon(new ImageIcon(captchaImage));
+            
+            // 입력 필드 초기화
+            jTextFieldCaptcha.setText("");
+            
+        } catch (Exception e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(this, "캡챠 생성 실패: " + e.getMessage());
+        }
+    }
+    
+    // 랜덤 캡챠 텍스트 생성
+    private String generateCaptchaText() {
+        String chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < 6; i++) {
+            int index = random.nextInt(chars.length());
+            sb.append(chars.charAt(index));
+        }
+        return sb.toString();
+    }
+    
+    // 캡챠 이미지 생성
+    private BufferedImage generateCaptchaImage(String text) {
+        int width = 200;
+        int height = 50;
+        BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
+        Graphics2D g2d = image.createGraphics();
+        
+        // 배경 설정
+        g2d.setColor(Color.WHITE);
+        g2d.fillRect(0, 0, width, height);
+        
+        // 텍스트 설정
+        g2d.setFont(new Font("Arial", Font.BOLD, 30));
+        
+        // 각 문자를 약간 다른 위치와 각도로 그리기
+        for (int i = 0; i < text.length(); i++) {
+            g2d.setColor(getRandomColor());
+            
+            // 문자 회전
+            double rotation = -20 + random.nextInt(40);  // -20도에서 +20도 사이
+            g2d.translate(30 + i * 30, 35);
+            g2d.rotate(Math.toRadians(rotation));
+            g2d.drawString(String.valueOf(text.charAt(i)), 0, 0);
+            g2d.rotate(-Math.toRadians(rotation));
+            g2d.translate(-(30 + i * 30), -35);
+        }
+        
+        // 방해선 추가
+        g2d.setColor(Color.GRAY);
+        for (int i = 0; i < 5; i++) {
+            int x1 = random.nextInt(width);
+            int y1 = random.nextInt(height);
+            int x2 = random.nextInt(width);
+            int y2 = random.nextInt(height);
+            g2d.drawLine(x1, y1, x2, y2);
+        }
+        
+        g2d.dispose();
+        return image;
+    }
+    
+    // 랜덤 색상 생성
+    private Color getRandomColor() {
+        return new Color(
+            random.nextInt(100),
+            random.nextInt(100),
+            random.nextInt(100)
+        );
+    }
+    
+    // 캡챠 검증
+    private boolean validateCaptcha() {
+        String userInput = jTextFieldCaptcha.getText();
+        return userInput != null && userInput.equalsIgnoreCase(captchaAnswer);
+    }
     /**
      * This method is called from within the constructor to initialize the form.
      * WARNING: Do NOT modify this code. The content of this method is always
@@ -60,6 +185,9 @@ public class MainFrame extends javax.swing.JFrame {
         jPasswordField1 = new javax.swing.JPasswordField();
         jButton1 = new javax.swing.JButton();
         jButton2 = new javax.swing.JButton();
+        jLabelCaptcha = new javax.swing.JLabel();
+        jTextFieldCaptcha = new javax.swing.JTextField();
+        jButtonRefresh = new javax.swing.JButton();
 
         jLabel4.setText("회원가입");
 
@@ -167,33 +295,58 @@ public class MainFrame extends javax.swing.JFrame {
             }
         });
 
+        jLabelCaptcha.setText("캡챠");
+
+        jTextFieldCaptcha.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                jTextFieldCaptchaActionPerformed(evt);
+            }
+        });
+
+        jButtonRefresh.setText("새로고침");
+        jButtonRefresh.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                jButtonRefreshActionPerformed(evt);
+            }
+        });
+
         javax.swing.GroupLayout layout = new javax.swing.GroupLayout(getContentPane());
         getContentPane().setLayout(layout);
         layout.setHorizontalGroup(
             layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(layout.createSequentialGroup()
-                .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                    .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING)
-                        .addComponent(jButton2)
+                .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING)
+                    .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                        .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING)
+                            .addGroup(layout.createSequentialGroup()
+                                .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
+                                    .addGroup(layout.createSequentialGroup()
+                                        .addGap(166, 166, 166)
+                                        .addComponent(jLabel1))
+                                    .addGroup(layout.createSequentialGroup()
+                                        .addContainerGap()
+                                        .addComponent(jLabel2)
+                                        .addGap(18, 18, 18)
+                                        .addComponent(jTextField1))
+                                    .addGroup(layout.createSequentialGroup()
+                                        .addContainerGap()
+                                        .addComponent(jLabel3)
+                                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                                        .addComponent(jPasswordField1, javax.swing.GroupLayout.PREFERRED_SIZE, 299, javax.swing.GroupLayout.PREFERRED_SIZE)))
+                                .addGap(12, 12, 12))
+                            .addGroup(javax.swing.GroupLayout.Alignment.LEADING, layout.createSequentialGroup()
+                                .addContainerGap()
+                                .addComponent(jLabelCaptcha)
+                                .addGap(18, 18, 18)
+                                .addComponent(jTextFieldCaptcha, javax.swing.GroupLayout.PREFERRED_SIZE, 125, javax.swing.GroupLayout.PREFERRED_SIZE)))
                         .addGroup(layout.createSequentialGroup()
-                            .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
-                                .addGroup(layout.createSequentialGroup()
-                                    .addGap(166, 166, 166)
-                                    .addComponent(jLabel1))
-                                .addGroup(layout.createSequentialGroup()
-                                    .addContainerGap()
-                                    .addComponent(jLabel2)
-                                    .addGap(18, 18, 18)
-                                    .addComponent(jTextField1))
-                                .addGroup(layout.createSequentialGroup()
-                                    .addContainerGap()
-                                    .addComponent(jLabel3)
-                                    .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                                    .addComponent(jPasswordField1, javax.swing.GroupLayout.PREFERRED_SIZE, 299, javax.swing.GroupLayout.PREFERRED_SIZE)))
-                            .addGap(12, 12, 12)))
+                            .addGap(161, 161, 161)
+                            .addComponent(jButton1)))
                     .addGroup(layout.createSequentialGroup()
-                        .addGap(161, 161, 161)
-                        .addComponent(jButton1)))
+                        .addContainerGap()
+                        .addComponent(jButtonRefresh)
+                        .addGap(18, 18, 18)
+                        .addComponent(jButton2)))
                 .addContainerGap(29, Short.MAX_VALUE))
         );
         layout.setVerticalGroup(
@@ -211,44 +364,34 @@ public class MainFrame extends javax.swing.JFrame {
                     .addComponent(jPasswordField1, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
                 .addComponent(jButton1)
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, 104, Short.MAX_VALUE)
-                .addComponent(jButton2)
-                .addGap(27, 27, 27))
+                .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                    .addGroup(layout.createSequentialGroup()
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                        .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                            .addComponent(jButton2)
+                            .addComponent(jButtonRefresh))
+                        .addGap(6, 6, 6))
+                    .addGroup(layout.createSequentialGroup()
+                        .addGap(41, 41, 41)
+                        .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                            .addComponent(jLabelCaptcha)
+                            .addComponent(jTextFieldCaptcha, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
+                        .addGap(26, 90, Short.MAX_VALUE))))
         );
 
         pack();
     }// </editor-fold>//GEN-END:initComponents
     
     
-//    private boolean verifyCaptcha(String captchaResponse) {
-//        try {
-//            // Google reCAPTCHA 검증 URL
-//            String url = "https://www.google.com/recaptcha/enterprise.js?render=6Lcxu4gqAAAAAJA8J0J7ykgb9c5m93aLXV51NqvH";
-//            String params = "secret=" + RECAPTCHA_SECRET_KEY + "&response=" + captchaResponse;
-//
-//            // HTTP 요청을 생성
-//            HttpURLConnection connection = (HttpURLConnection) new URL(url).openConnection();
-//            connection.setRequestMethod("POST");
-//            connection.setDoOutput(true);
-//            connection.getOutputStream().write(params.getBytes());
-//
-//            // 응답 처리
-//            Scanner scanner = new Scanner(connection.getInputStream());
-//            StringBuilder response = new StringBuilder();
-//            while (scanner.hasNext()) {
-//                response.append(scanner.nextLine());
-//            }
-//            scanner.close();
-//
-//            // 응답 확인
-//            return response.toString().contains("\"success\": true");
-//        } catch (IOException e) {
-//            e.printStackTrace();
-//            return false;
-//        }
-//    }
+
     private void jButton1ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton1ActionPerformed
         // TODO add your handling code here:
+        if (!validateCaptcha()) {
+            JOptionPane.showMessageDialog(this, "보안문자가 일치하지 않습니다.");
+            refreshCaptcha();
+            return;
+        }
+        
         String id = jTextField1.getText();
         String password = new String(jPasswordField1.getPassword());
         //String captchaResponse = jCaptchaField.getText();  // CAPTCHA 입력값
@@ -258,42 +401,33 @@ public class MainFrame extends javax.swing.JFrame {
             return;
         }
 
-//        if (captchaResponse.isEmpty()) {
-//            JOptionPane.showMessageDialog(this, "CAPTCHA 인증을 완료하세요.");
-//            return;
-//        }
-//
-//        // CAPTCHA 검증
-//        if (!verifyCaptcha(captchaResponse)) {
-//            JOptionPane.showMessageDialog(this, "CAPTCHA 인증에 실패했습니다.");
-//            return;
-//        }else{
-//                JOptionPane.showMessageDialog(this, "CAPTCHA 인증에 성공했습니다.");
-//                this.setVisible(false);
-//        }
 
-        try (Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD)) {
-            String query = "SELECT * FROM users WHERE id = ? AND password = ?";
-            PreparedStatement pstmt = conn.prepareStatement(query);
-            pstmt.setString(1, id);
-            pstmt.setString(2, password);
-            ResultSet rs = pstmt.executeQuery();
+            try (Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD)) {
+        // SELECT 쿼리를 수정하여 user_seq도 가져오도록 함
+        String query = "SELECT user_seq, id FROM users WHERE id = ? AND password = ?";
+        PreparedStatement pstmt = conn.prepareStatement(query);
+        pstmt.setString(1, id);
+        pstmt.setString(2, password);
+        ResultSet rs = pstmt.executeQuery();
 
-            if (rs.next()) {
-                JOptionPane.showMessageDialog(this, "로그인 성공!");
-                try {
-                    // CalendarApp의 main 메서드를 호출
-                    CalendarApp.main(new String[]{});  // main 메서드 호출
-                    this.setVisible(false);  // 로그인 화면 숨기기
-                } catch (Exception e) {
-                    JOptionPane.showMessageDialog(this, "CalendarApp 실행 실패: " + e.getMessage());
-                }
-            } else {
-                JOptionPane.showMessageDialog(this, "아이디 또는 비밀번호가 틀렸습니다.");
+        if (rs.next()) {
+            // ResultSet에서 user_seq 값을 가져옴
+            int userSeq = rs.getInt("user_seq");
+
+            JOptionPane.showMessageDialog(this, "로그인 성공!");
+            try {
+                CalendarApp app = new CalendarApp(userSeq);  // 가져온 userSeq 값을 전달
+                app.setVisible(true);
+                this.setVisible(false);  // 로그인 화면 숨기기
+            } catch (Exception e) {
+                JOptionPane.showMessageDialog(this, "CalendarApp 실행 실패: " + e.getMessage());
             }
-        } catch (Exception e) {
-            JOptionPane.showMessageDialog(this, "데이터베이스 연결 실패: " + e.getMessage());
+        } else {
+            JOptionPane.showMessageDialog(this, "아이디 또는 비밀번호가 틀렸습니다.");
         }
+    } catch (Exception e) {
+        JOptionPane.showMessageDialog(this, "데이터베이스 연결 실패: " + e.getMessage());
+    }
     }//GEN-LAST:event_jButton1ActionPerformed
 
     private void jButton2ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton2ActionPerformed
@@ -363,6 +497,14 @@ public class MainFrame extends javax.swing.JFrame {
         }
     }//GEN-LAST:event_jButton3ActionPerformed
 
+    private void jButtonRefreshActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButtonRefreshActionPerformed
+        // TODO add your handling code here:
+    }//GEN-LAST:event_jButtonRefreshActionPerformed
+
+    private void jTextFieldCaptchaActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jTextFieldCaptchaActionPerformed
+        // TODO add your handling code here:
+    }//GEN-LAST:event_jTextFieldCaptchaActionPerformed
+
     /**
      * @param args the command line arguments
      */
@@ -404,6 +546,7 @@ public class MainFrame extends javax.swing.JFrame {
     private javax.swing.JButton jButton2;
     private javax.swing.JButton jButton3;
     private javax.swing.JButton jButton4;
+    private javax.swing.JButton jButtonRefresh;
     private javax.swing.JFrame jFrame1;
     private javax.swing.JLabel jLabel1;
     private javax.swing.JLabel jLabel2;
@@ -413,11 +556,13 @@ public class MainFrame extends javax.swing.JFrame {
     private javax.swing.JLabel jLabel6;
     private javax.swing.JLabel jLabel7;
     private javax.swing.JLabel jLabel8;
+    private javax.swing.JLabel jLabelCaptcha;
     private javax.swing.JPasswordField jPasswordField1;
     private javax.swing.JTextField jTextField1;
     private javax.swing.JTextField jTextField2;
     private javax.swing.JTextField jTextField3;
     private javax.swing.JTextField jTextField4;
     private javax.swing.JTextField jTextField5;
+    private javax.swing.JTextField jTextFieldCaptcha;
     // End of variables declaration//GEN-END:variables
 }

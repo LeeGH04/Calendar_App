@@ -14,6 +14,8 @@ import java.sql.Time;
 
 
 
+
+
 public class CalendarApp extends javax.swing.JFrame {
     private JLabel monthLabel;
     private JPanel calendarPanel;
@@ -21,26 +23,30 @@ public class CalendarApp extends javax.swing.JFrame {
     private int currentMonth;
     private int currentYear;
     private JTextArea todoArea;
-    private int currentUserId = 1; // 현재 로그인한 사용자 ID (임시)
+    private final int currentUserId;
 
     // 데이터베이스 연결 정보
-    private static final String DB_URL = "jdbc:mysql://localhost:3306/calendar_db";
-    private static final String DB_USER = "root"; // MySQL 사용자 이름
-    private static final String DB_PASSWORD = "lo112233.."; // MySQL 비밀번호
+//    private static final String DB_URL = "jdbc:mysql://localhost:3306/calendar_db";
+//    private static final String DB_USER = "root"; // MySQL 사용자 이름
+//    private static final String DB_PASSWORD = "lo112233.."; // MySQL 비밀번호
+    
+    private final String DB_URL = "jdbc:mysql://localhost:3306/calendar_db";
+    private final String DB_USER = "LeeGH04";  // MySQL 사용자 이름
+    private final String DB_PASSWORD = "0004";  // MySQL 비밀번호
 
     private Connection conn;
     
-    public CalendarApp() {
-        initializeDatabase();
-        setTitle("캘린더 & 할 일");
-        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        setSize(800, 500);
-        setLayout(new BorderLayout());
+public CalendarApp(int user_seq) {
+    this.currentUserId = user_seq;  // 매개변수로 받은 userId를 저장
+    initializeDatabase();
+    setTitle("캘린더 & 할 일");
+    setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+    setSize(800, 500);
+    setLayout(new BorderLayout());
 
-        calendar = Calendar.getInstance();
-        currentMonth = calendar.get(Calendar.MONTH);
-        currentYear = calendar.get(Calendar.YEAR);
-
+    calendar = Calendar.getInstance();
+    currentMonth = calendar.get(Calendar.MONTH);
+    currentYear = calendar.get(Calendar.YEAR);
         // 메인 패널 (캘린더 + 할 일 목록)
         JPanel mainPanel = new JPanel(new GridLayout(1, 2, 10, 0));
 
@@ -221,7 +227,7 @@ public class CalendarApp extends javax.swing.JFrame {
     private Map<Integer, Integer> getTodoCountForMonth() {
         Map<Integer, Integer> todoCount = new HashMap<>();
         String sql = "SELECT DAY(date) as day, COUNT(*) as count FROM todos " +
-                "WHERE user_id = ? AND YEAR(date) = ? AND MONTH(date) = ? " +
+                "WHERE user_seq = ? AND YEAR(date) = ? AND MONTH(date) = ? " +
                 "GROUP BY DAY(date)";
 
         try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
@@ -249,11 +255,11 @@ public class CalendarApp extends javax.swing.JFrame {
 
         // 지난 항목을 완료로 업데이트하는 SQL 쿼리
         String updateSql = "UPDATE todos SET completed = 1 " +
-                           "WHERE user_id = ? AND (date < ? OR (date = ? AND end_time < ?)) AND completed = 0";
+                           "WHERE user_seq = ? AND (date < ? OR (date = ? AND end_time < ?)) AND completed = 0";
 
         // 선택된 날짜의 할 일 목록을 가져오는 SQL 쿼리
         String selectSql = "SELECT title, start_time, end_time, completed FROM todos " +
-                           "WHERE user_id = ? AND date = ? ORDER BY start_time";
+                           "WHERE user_seq = ? AND date = ? ORDER BY start_time";
 
         todoArea.setText(String.format("=== %d년 %d월 %d일 할 일 ===\n", currentYear, currentMonth + 1, day));
 
@@ -293,7 +299,7 @@ public class CalendarApp extends javax.swing.JFrame {
     }
 
     private void addTodo(String title, java.sql.Time startTime, java.sql.Time endTime) {
-        String sql = "INSERT INTO todos (user_id, title, date, start_time, end_time) VALUES (?, ?, ?, ?, ?)";
+        String sql = "INSERT INTO todos (user_seq, title, date, start_time, end_time) VALUES (?, ?, ?, ?, ?)";
 
         try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
             pstmt.setInt(1, currentUserId);
@@ -309,10 +315,10 @@ public class CalendarApp extends javax.swing.JFrame {
             JOptionPane.showMessageDialog(this, "할 일 추가 실패: " + e.getMessage());
         }
     }
-    public static void main(String[] args) {
-        SwingUtilities.invokeLater(() -> {
-            CalendarApp app = new CalendarApp();
-            app.setVisible(true);
-        });
-    }
+//    public static void main(String[] args) {
+//    SwingUtilities.invokeLater(() -> {
+//        CalendarApp app = new CalendarApp(1); // 테스트용 ID
+//        app.setVisible(true);
+//    });
+//}
 }

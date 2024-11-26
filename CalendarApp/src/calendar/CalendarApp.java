@@ -163,66 +163,91 @@ public CalendarApp(int user_seq) {
     }
 
     private void updateCalendar() {
-        calendarPanel.removeAll();
+    calendarPanel.removeAll();
 
-        monthLabel.setText(String.format("%d년 %d월", currentYear, currentMonth + 1));
+    monthLabel.setText(String.format("%d년 %d월", currentYear, currentMonth + 1));
 
-        String[] weekDays = {"일", "월", "화", "수", "목", "금", "토"};
-        for (String day : weekDays) {
-            JLabel label = new JLabel(day, SwingConstants.CENTER);
-            if (day.equals("일")) {
-                label.setForeground(Color.RED);
-            } else if (day.equals("토")) {
-                label.setForeground(Color.BLUE);
-            }
-            calendarPanel.add(label);
+    // 요일 헤더 추가
+    String[] weekDays = {"일", "월", "화", "수", "목", "금", "토"};
+    for (String day : weekDays) {
+        JLabel label = new JLabel(day, SwingConstants.CENTER);
+        if (day.equals("일")) {
+            label.setForeground(Color.RED);
+        } else if (day.equals("토")) {
+            label.setForeground(Color.BLUE);
         }
-
-        calendar.set(currentYear, currentMonth, 1);
-        int firstDay = calendar.get(Calendar.DAY_OF_WEEK) - 1;
-        int daysInMonth = calendar.getActualMaximum(Calendar.DAY_OF_MONTH);
-
-        for (int i = 0; i < firstDay; i++) {
-            calendarPanel.add(new JLabel(""));
-        }
-
-        // 날짜별 할 일 개수 조회
-        Map<Integer, Integer> todoCount = getTodoCountForMonth();
-
-        for (int day = 1; day <= daysInMonth; day++) {
-            JLabel dayLabel = new JLabel(String.valueOf(day), SwingConstants.CENTER);
-            dayLabel.setOpaque(true);
-            dayLabel.setBorder(BorderFactory.createLineBorder(Color.LIGHT_GRAY));
-
-            final int currentDay = day;
-            dayLabel.addMouseListener(new MouseAdapter() {
-                @Override
-                public void mouseClicked(MouseEvent e) {
-                    selectDate(currentDay);
-                }
-            });
-
-            calendar.set(Calendar.DAY_OF_MONTH, day);
-            int dayOfWeek = calendar.get(Calendar.DAY_OF_WEEK);
-            if (dayOfWeek == Calendar.SUNDAY) {
-                dayLabel.setForeground(Color.RED);
-            } else if (dayOfWeek == Calendar.SATURDAY) {
-                dayLabel.setForeground(Color.BLUE);
-            }
-
-            // 할 일이 있는 날짜 표시
-            if (todoCount.containsKey(day) && todoCount.get(day) > 0) {
-                dayLabel.setBackground(new Color(255, 255, 200));
-            } else {
-                dayLabel.setBackground(Color.WHITE);
-            }
-
-            calendarPanel.add(dayLabel);
-        }
-
-        calendarPanel.revalidate();
-        calendarPanel.repaint();
+        calendarPanel.add(label);
     }
+
+    // 첫 날의 요일과 해당 월의 총 일수 계산
+    calendar.set(currentYear, currentMonth, 1);
+    int firstDayOfWeek = calendar.get(Calendar.DAY_OF_WEEK); // 1 (일요일) ~ 7 (토요일)
+    int daysInMonth = calendar.getActualMaximum(Calendar.DAY_OF_MONTH);
+    
+    // 이전 달의 마지막 날짜들을 채움
+    calendar.add(Calendar.MONTH, -1);
+    int prevMonthDays = calendar.getActualMaximum(Calendar.DAY_OF_MONTH);
+    calendar.add(Calendar.MONTH, 1); // 다시 현재 달로 설정
+    
+    for (int i = 1; i < firstDayOfWeek; i++) {
+        JLabel emptyLabel = new JLabel(String.valueOf(prevMonthDays - firstDayOfWeek + i + 1), SwingConstants.CENTER);
+        emptyLabel.setForeground(Color.GRAY);
+        emptyLabel.setEnabled(false);
+        calendarPanel.add(emptyLabel);
+    }
+
+    // 날짜별 할 일 개수 조회
+    Map<Integer, Integer> todoCount = getTodoCountForMonth();
+
+    // 현재 달의 날짜들을 채움
+    int dayOfWeek = firstDayOfWeek;
+    for (int day = 1; day <= daysInMonth; day++) {
+        JLabel dayLabel = new JLabel(String.valueOf(day), SwingConstants.CENTER);
+        dayLabel.setOpaque(true);
+        dayLabel.setBorder(BorderFactory.createLineBorder(Color.LIGHT_GRAY));
+
+        final int currentDay = day;
+        dayLabel.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                selectDate(currentDay);
+            }
+        });
+
+        // 주말 색상 처리
+        if (dayOfWeek == Calendar.SUNDAY) {
+            dayLabel.setForeground(Color.RED);
+        } else if (dayOfWeek == Calendar.SATURDAY) {
+            dayLabel.setForeground(Color.BLUE);
+        }
+
+        // 할 일이 있는 날짜 표시
+        if (todoCount.containsKey(day) && todoCount.get(day) > 0) {
+            dayLabel.setBackground(new Color(255, 255, 200));
+        } else {
+            dayLabel.setBackground(Color.WHITE);
+        }
+
+        calendarPanel.add(dayLabel);
+        
+        dayOfWeek++;
+        if (dayOfWeek > Calendar.SATURDAY) {
+            dayOfWeek = Calendar.SUNDAY;
+        }
+    }
+
+    // 다음 달의 시작 일자들로 나머지 칸을 채움
+    int remainingCells = 42 - (firstDayOfWeek - 1 + daysInMonth); // 항상 42개 셀(6주)를 유지
+    for (int i = 1; i <= remainingCells; i++) {
+        JLabel emptyLabel = new JLabel(String.valueOf(i), SwingConstants.CENTER);
+        emptyLabel.setForeground(Color.GRAY);
+        emptyLabel.setEnabled(false);
+        calendarPanel.add(emptyLabel);
+    }
+
+    calendarPanel.revalidate();
+    calendarPanel.repaint();
+}
 
     private Map<Integer, Integer> getTodoCountForMonth() {
         Map<Integer, Integer> todoCount = new HashMap<>();

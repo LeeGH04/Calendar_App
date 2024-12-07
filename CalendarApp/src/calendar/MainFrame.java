@@ -51,10 +51,14 @@ public class MainFrame extends javax.swing.JFrame {
 //    private final String DB_USER = "root";  // MySQL 사용자 이름
 //    private final String DB_PASSWORD = "lo112233..";  // MySQL 비밀번호
     
+//    private final String DB_URL = "jdbc:mysql://localhost:3306/calendar_db";
+//    private final String DB_USER = "LeeGH04";  // MySQL 사용자 이름
+//    private final String DB_PASSWORD = "0004";  // MySQL 비밀번호
+
     private final String DB_URL = "jdbc:mysql://localhost:3306/calendar_db";
-    private final String DB_USER = "LeeGH04";  // MySQL 사용자 이름
-    private final String DB_PASSWORD = "0004";  // MySQL 비밀번호
-     
+    private final String DB_USER = "root";  // MySQL 사용자 이름
+    private final String DB_PASSWORD = "8421choi@";  // MySQL 비밀번호
+    
     private String captchaAnswer; // 현재 캡챠 답변 저장
     private Random random = new Random();
     
